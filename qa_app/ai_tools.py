@@ -1,8 +1,8 @@
+# ai_tools.py (简化版本)
 import os
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_community.utilities import SQLDatabase
 from langchain_openai import ChatOpenAI
-import psycopg2
 from django.conf import settings
 import logging
 
@@ -32,20 +32,20 @@ def get_sql_agent():
         if not settings.SILICONFLOW_BASE_URL:
             raise ValueError("硅基流动 API 地址未配置")
         
-        # 初始化LLM - 使用硅基流动的DeepSeek模型
+        # 初始化LLM
         llm = ChatOpenAI(
-            model="deepseek-ai/DeepSeek-V3.1-Terminus",  # 硅基流动上的模型名称
+            model="deepseek-ai/DeepSeek-V3.1-Terminus",
             temperature=0,
-            openai_api_key=settings.SILICONFLOW_API_KEY,  # 使用硅基流动的API密钥
-            openai_api_base=settings.SILICONFLOW_BASE_URL,  # 硅基流动的API地址
+            openai_api_key=settings.SILICONFLOW_API_KEY,
+            openai_api_base=settings.SILICONFLOW_BASE_URL,
         )
         
-        # 创建SQL Agent
+        # 创建SQL Agent - 使用最小配置
         agent = create_sql_agent(
             llm=llm,
             db=db,
-            agent_type="openai-tools",
-            verbose=True
+            verbose=True,
+            agent_type="openai-tools",  # 使用字符串而不是枚举
         )
         
         logger.info("SQL Agent初始化成功（使用硅基流动）")
@@ -55,7 +55,7 @@ def get_sql_agent():
         logger.error(f"初始化SQL Agent失败: {str(e)}")
         raise
 
-# 预初始化Agent（可选，用于提高响应速度）
+# 预初始化Agent
 _sql_agent = None
 
 def get_cached_sql_agent():

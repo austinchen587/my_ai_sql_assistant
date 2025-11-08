@@ -7,6 +7,9 @@ urlpatterns = [
     
     # AI功能路由
     path('ask/', ai_views.ask_question, name='ask_question'),
+
+    #历史对话记录
+    path('conversation-history/', ai_views.get_conversation_history, name='conversation_history'),
     
     # 其他路由...
 ]

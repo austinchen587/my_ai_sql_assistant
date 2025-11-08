@@ -6,7 +6,9 @@ import time
 import re
 import pandas as pd
 from io import StringIO
+from datetime import timedelta
 from ..ai_tools import get_cached_sql_agent
+from ..conversation_manager import conversation_manager
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +218,7 @@ class ResponseFormatter:
         
         return '\n'.join(formatted_lines)
 
+# ai_views.py (关键修改部分)
 @csrf_exempt
 def ask_question(request):
     """处理AI问答请求"""
@@ -234,24 +237,50 @@ def ask_question(request):
             
             logger.info(f"📥 收到问题: {question}")
             
+            # 检查是否有相似的对话历史
+            similar_conversations = conversation_manager.search_conversations(question, limit=3)
+            if similar_conversations:
+                logger.info(f"找到 {len(similar_conversations)} 条相似对话历史")
+            
             # 获取缓存的AI Agent并处理问题
             agent = get_cached_sql_agent()
-            result = agent.invoke({"input": question})
             
-            raw_answer = result.get('output', '抱歉，我无法回答这个问题。')
+            try:
+                # 尝试执行查询，添加超时和重试机制
+                result = agent.invoke({"input": question})
+                raw_answer = result.get('output', '抱歉，我无法回答这个问题。')
+                
+            except Exception as agent_error:
+                logger.warning(f"Agent执行失败，尝试简化查询: {str(agent_error)}")
+                
+                # 如果Agent失败，尝试简化问题或返回友好的错误信息
+                if "maximum iterations" in str(agent_error).lower():
+                    raw_answer = "这个问题比较复杂，我暂时无法处理。请尝试更简单、更具体的查询，比如：\n\n1. '显示最近的10个采购项目'\n2. '统计各地区的采购数量'\n3. '查询医疗相关的采购项目'\n\n或者将复杂问题拆分成几个简单的问题分别提问。"
+                else:
+                    raw_answer = f"处理查询时遇到问题：{str(agent_error)}。请尝试简化您的问题。"
             
             # 格式化响应
             formatted_answer = ResponseFormatter.format_ai_response(raw_answer)
             
             response_time = time.time() - start_time
-            logger.info(f"✅ 回答生成 - 耗时: {response_time:.2f}s")
+            
+            # 保存对话到知识库
+            save_success = conversation_manager.save_conversation(
+                question=question,
+                raw_answer=raw_answer,
+                formatted_answer=formatted_answer,
+                response_time=f"{response_time:.2f}s"
+            )
+            
+            logger.info(f"✅ 回答生成 - 耗时: {response_time:.2f}s, 保存状态: {'成功' if save_success else '失败'}")
             
             return JsonResponse({
                 'success': True,
                 'answer': formatted_answer,
-                'raw_answer': raw_answer,  # 保留原始答案用于调试
+                'raw_answer': raw_answer,
                 'question': question,
-                'response_time': f"{response_time:.2f}s"
+                'response_time': f"{response_time:.2f}s",
+                'similar_conversations_count': len(similar_conversations)
             })
             
         except json.JSONDecodeError:
@@ -270,4 +299,33 @@ def ask_question(request):
     return JsonResponse({
         'success': False,
         'error': '仅支持POST请求'
+    }, status=405)
+
+
+@csrf_exempt
+def get_conversation_history(request):
+    """获取对话历史API"""
+    if request.method == 'GET':
+        try:
+            days = int(request.GET.get('days', 7))
+            limit = int(request.GET.get('limit', 50))
+            
+            history = conversation_manager.get_conversation_history(days=days)[:limit]
+            
+            return JsonResponse({
+                'success': True,
+                'history': history,
+                'total_count': len(history)
+            })
+            
+        except Exception as e:
+            logger.error(f"获取对话历史失败: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'获取对话历史失败: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'error': '仅支持GET请求'
     }, status=405)

@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI SQL 智能助手</title>
+    <title>磊极科技 AI SQL 智能助手</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --primary-color: #007bff;
@@ -27,8 +28,64 @@
         .chat-wrapper {
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
             padding: 1rem;
+            gap: 1rem;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .history-item:hover {
+            background-color: var(--light-color);
+            border-left-color: var(--primary-color);
+        }
+        
+        .history-item.active {
+            background-color: rgba(0,123,255,0.1);
+            border-left-color: var(--primary-color);
+        }
+        
+        .history-question {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .history-time {
+            font-size: 0.8em;
+            color: var(--secondary-color);
         }
         
         .chat-container {
@@ -39,9 +96,7 @@
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
+            min-width: 0;
         }
         
         .chat-header {
@@ -49,6 +104,24 @@
             color: white;
             padding: 1.5rem 2rem;
             border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-light {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+        }
+        
+        .btn-light:hover {
+            background: rgba(255,255,255,0.3);
         }
         
         .chat-messages {
@@ -227,10 +300,26 @@
             text-align: right;
         }
         
+        .similar-conversation-hint {
+            background: #e7f3ff;
+            border-left: 4px solid var(--primary-color);
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
         /* 响应式设计 */
         @media (max-width: 768px) {
             .chat-wrapper {
+                flex-direction: column;
                 padding: 0.5rem;
+            }
+            
+            .sidebar {
+                width: 100%;
+                margin-bottom: 1rem;
+                max-height: 200px;
             }
             
             .chat-header {
@@ -273,10 +362,34 @@
 </head>
 <body>
     <div class="chat-wrapper">
+        <!-- 侧边栏 - 对话历史 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h5 class="mb-1"><i class="fas fa-history"></i> 对话历史</h5>
+                <small>最近7天对话记录</small>
+            </div>
+            <div class="sidebar-content" id="historySidebar">
+                <div class="text-center text-muted py-3">
+                    <i class="fas fa-spinner fa-spin"></i> 加载中...
+                </div>
+            </div>
+        </div>
+        
+        <!-- 主聊天区域 -->
         <div class="chat-container">
-            <div class="chat-header text-center">
-                <h2 class="mb-2">🤖磊极科技 AI SQL 智能助手</h2>
-                <p class="mb-0 opacity-75">基于政府采购数据库的自然语言查询系统</p>
+            <div class="chat-header">
+                <div>
+                    <h4 class="mb-1">🤖 磊极科技 AI SQL 智能助手</h4>
+                    <small class="opacity-75">基于政府采购数据库的自然语言查询系统</small>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-light btn-sm" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <button class="btn btn-light btn-sm" onclick="clearChat()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="chat-messages" id="chatMessages">
@@ -293,7 +406,7 @@
                                 <li>"按采购方式分类统计"</li>
                                 <li>"搜索包含特定关键词的项目"</li>
                             </ul>
-                            <p>我会以清晰的表格和格式化的方式展示查询结果！</p>
+                            <p>所有对话都会自动保存，方便您后续查看和参考！</p>
                         </div>
                     </div>
                 </div>
@@ -313,8 +426,8 @@
                     <input type="text" class="form-control" id="questionInput" 
                            placeholder="请输入您关于政府采购数据的问题..." autocomplete="off">
                     <button class="btn btn-primary" type="button" id="sendButton">
-                        <span>发送</span>
-                        <span class="ms-1">↵</span>
+                        <i class="fas fa-paper-plane"></i>
+                        <span class="ms-1">发送</span>
                     </button>
                 </div>
             </div>
@@ -329,11 +442,14 @@
                 this.questionInput = document.getElementById('questionInput');
                 this.sendButton = document.getElementById('sendButton');
                 this.loadingIndicator = document.getElementById('loadingIndicator');
+                this.historySidebar = document.getElementById('historySidebar');
+                this.conversationHistory = [];
                 this.init();
             }
             
             init() {
                 this.setupEventListeners();
+                this.loadConversationHistory();
                 this.questionInput.focus();
             }
             
@@ -345,15 +461,59 @@
                     }
                 });
                 
-                // 输入框自动调整高度
                 this.questionInput.addEventListener('input', () => {
                     this.adjustInputHeight();
                 });
             }
             
-            adjustInputHeight() {
-                this.questionInput.style.height = 'auto';
-                this.questionInput.style.height = Math.min(this.questionInput.scrollHeight, 120) + 'px';
+            async loadConversationHistory() {
+                try {
+                    const response = await fetch('/conversation-history/?days=7&limit=50');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.conversationHistory = data.history;
+                        this.renderHistorySidebar();
+                    }
+                } catch (error) {
+                    console.error('加载对话历史失败:', error);
+                    this.historySidebar.innerHTML = '<div class="text-center text-muted py-3">加载失败</div>';
+                }
+            }
+            
+            renderHistorySidebar() {
+                if (this.conversationHistory.length === 0) {
+                    this.historySidebar.innerHTML = '<div class="text-center text-muted py-3">暂无对话记录</div>';
+                    return;
+                }
+                
+                let html = '';
+                this.conversationHistory.forEach((conversation, index) => {
+                    const time = new Date(conversation.timestamp).toLocaleString();
+                    const question = conversation.question.length > 50 ? 
+                        conversation.question.substring(0, 50) + '...' : conversation.question;
+                    
+                    html += `
+                        <div class="history-item" onclick="chatApp.loadConversation(${index})">
+                            <div class="history-question">${this.escapeHtml(question)}</div>
+                            <div class="history-time">${time}</div>
+                        </div>
+                    `;
+                });
+                
+                this.historySidebar.innerHTML = html;
+            }
+            
+            loadConversation(index) {
+                const conversation = this.conversationHistory[index];
+                if (!conversation) return;
+                
+                // 清空当前聊天
+                this.chatMessages.innerHTML = '';
+                
+                // 添加历史对话
+                this.addMessage(this.escapeHtml(conversation.question), true);
+                this.addMessage(conversation.formatted_answer, false, conversation.response_time);
             }
             
             addMessage(content, isUser = false, responseTime = null) {
@@ -362,7 +522,7 @@
                 
                 const avatarDiv = document.createElement('div');
                 avatarDiv.className = 'message-avatar';
-                avatarDiv.textContent = isUser ? '👤' : '🤖';
+                avatarDiv.innerHTML = isUser ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
                 
                 const bubbleDiv = document.createElement('div');
                 bubbleDiv.className = 'message-bubble';
@@ -375,7 +535,7 @@
                 if (responseTime && !isUser) {
                     const timeDiv = document.createElement('div');
                     timeDiv.className = 'response-time';
-                    timeDiv.textContent = `生成时间: ${responseTime}`;
+                    timeDiv.innerHTML = `<i class="fas fa-clock"></i> 生成时间: ${responseTime}`;
                     bubbleDiv.appendChild(timeDiv);
                 }
                 
@@ -390,16 +550,13 @@
                 const question = this.questionInput.value.trim();
                 if (!question) return;
                 
-                // 添加用户消息
                 this.addMessage(this.escapeHtml(question), true);
                 this.questionInput.value = '';
                 this.adjustInputHeight();
                 
-                // 显示加载指示器
                 this.loadingIndicator.style.display = 'block';
                 this.scrollToBottom();
                 
-                // 发送请求到后端
                 fetch('/ask/', {
                     method: 'POST',
                     headers: {
@@ -414,6 +571,14 @@
                     
                     if (data.success) {
                         this.addMessage(data.answer, false, data.response_time);
+                        
+                        // 如果有相似对话，显示提示
+                        if (data.similar_conversations_count > 0) {
+                            this.showSimilarConversationsHint(data.similar_conversations_count);
+                        }
+                        
+                        // 重新加载历史记录
+                        setTimeout(() => this.loadConversationHistory(), 1000);
                     } else {
                         this.addMessage(`抱歉，发生错误：${data.error || '未知错误'}`, false);
                     }
@@ -423,6 +588,23 @@
                     this.addMessage('网络错误，请检查连接后重试', false);
                     console.error('Error:', error);
                 });
+            }
+            
+            showSimilarConversationsHint(count) {
+                const hintDiv = document.createElement('div');
+                hintDiv.className = 'similar-conversation-hint';
+                hintDiv.innerHTML = `
+                    <i class="fas fa-info-circle"></i>
+                    系统找到了 ${count} 条相似的历史对话，您可以在侧边栏查看
+                `;
+                
+                const lastMessage = this.chatMessages.lastChild;
+                this.chatMessages.insertBefore(hintDiv, lastMessage.nextSibling);
+            }
+            
+            adjustInputHeight() {
+                this.questionInput.style.height = 'auto';
+                this.questionInput.style.height = Math.min(this.questionInput.scrollHeight, 120) + 'px';
             }
             
             scrollToBottom() {
@@ -453,9 +635,32 @@
             }
         }
         
+        // 全局函数
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.style.display = sidebar.style.display === 'none' ? 'flex' : 'none';
+        }
+        
+        function clearChat() {
+            if (confirm('确定要清空当前对话吗？')) {
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.innerHTML = `
+                    <div class="message bot-message">
+                        <div class="message-avatar"><i class="fas fa-robot"></i></div>
+                        <div class="message-bubble">
+                            <div class="ai-content">
+                                <p>对话已清空，请问我关于政府采购数据的问题吧！</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
         // 初始化聊天应用
+        let chatApp;
         document.addEventListener('DOMContentLoaded', () => {
-            new ChatApp();
+            chatApp = new ChatApp();
         });
     </script>
 </body>
