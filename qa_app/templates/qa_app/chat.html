@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI SQL 智能助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .chat-wrapper {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary-color), #0056b3);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .message {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            max-width: 100%;
+        }
+        
+        .user-message {
+            justify-content: flex-end;
+        }
+        
+        .bot-message {
+            justify-content: flex-start;
+        }
+        
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        
+        .user-message .message-avatar {
+            background: var(--primary-color);
+            order: 2;
+        }
+        
+        .bot-message .message-avatar {
+            background: var(--secondary-color);
+        }
+        
+        .message-bubble {
+            max-width: min(70%, 800px);
+            padding: 1rem 1.25rem;
+            border-radius: 20px;
+            word-wrap: break-word;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .user-message .message-bubble {
+            background: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message .message-bubble {
+            background: var(--light-color);
+            color: var(--dark-color);
+            border-bottom-left-radius: 5px;
+        }
+        
+        .ai-content {
+            line-height: 1.6;
+        }
+        
+        .ai-content p {
+            margin-bottom: 0.75rem;
+        }
+        
+        .ai-content ul, .ai-content ol {
+            margin: 0.75rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .ai-content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .ai-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .ai-content th, .ai-content td {
+            border: 1px solid #dee2e6;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        
+        .ai-content th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+        
+        .ai-content tr:nth-child(even) {
+            background-color: rgba(0,123,255,0.05);
+        }
+        
+        .ai-content code {
+            background-color: #f8f9fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .ai-content pre {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .ai-content pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .ai-heading {
+            color: var(--primary-color);
+            margin: 1rem 0 0.5rem 0;
+            font-weight: 600;
+        }
+        
+        .chat-input-container {
+            padding: 1.5rem;
+            border-top: 1px solid #dee2e6;
+            background: white;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+            background: var(--light-color);
+            margin: 0 1.5rem;
+            border-radius: 10px;
+        }
+        
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-10px); opacity: 1; }
+        }
+        
+        .response-time {
+            font-size: 0.8em;
+            color: var(--secondary-color);
+            margin-top: 0.5rem;
+            text-align: right;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .chat-wrapper {
+                padding: 0.5rem;
+            }
+            
+            .chat-header {
+                padding: 1rem;
+            }
+            
+            .chat-messages {
+                padding: 1rem;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+            }
+            
+            .chat-input-container {
+                padding: 1rem;
+            }
+            
+            .ai-content table {
+                font-size: 0.8em;
+            }
+            
+            .ai-content th, .ai-content td {
+                padding: 0.5rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .message-bubble {
+                max-width: 90%;
+            }
+            
+            .message-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-wrapper">
+        <div class="chat-container">
+            <div class="chat-header text-center">
+                <h2 class="mb-2">🤖磊极科技 AI SQL 智能助手</h2>
+                <p class="mb-0 opacity-75">基于政府采购数据库的自然语言查询系统</p>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-bubble">
+                        <div class="ai-content">
+                            <p>👋 您好！我是AI SQL助手，可以帮您查询和分析政府采购数据库。</p>
+                            <p><strong>💡 您可以尝试询问：</strong></p>
+                            <ul>
+                                <li>"显示预算最高的三个项目"</li>
+                                <li>"统计各地区的采购数量"</li>
+                                <li>"查询最近一周的采购公告"</li>
+                                <li>"按采购方式分类统计"</li>
+                                <li>"搜索包含特定关键词的项目"</li>
+                            </ul>
+                            <p>我会以清晰的表格和格式化的方式展示查询结果！</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loading" id="loadingIndicator">
+                <div class="typing-indicator">
+                    <span>AI正在分析数据</span>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+            
+            <div class="chat-input-container">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="questionInput" 
+                           placeholder="请输入您关于政府采购数据的问题..." autocomplete="off">
+                    <button class="btn btn-primary" type="button" id="sendButton">
+                        <span>发送</span>
+                        <span class="ms-1">↵</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class ChatApp {
+            constructor() {
+                this.chatMessages = document.getElementById('chatMessages');
+                this.questionInput = document.getElementById('questionInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.loadingIndicator = document.getElementById('loadingIndicator');
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.questionInput.focus();
+            }
+            
+            setupEventListeners() {
+                this.sendButton.addEventListener('click', () => this.sendQuestion());
+                this.questionInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendQuestion();
+                    }
+                });
+                
+                // 输入框自动调整高度
+                this.questionInput.addEventListener('input', () => {
+                    this.adjustInputHeight();
+                });
+            }
+            
+            adjustInputHeight() {
+                this.questionInput.style.height = 'auto';
+                this.questionInput.style.height = Math.min(this.questionInput.scrollHeight, 120) + 'px';
+            }
+            
+            addMessage(content, isUser = false, responseTime = null) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+                
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'message-avatar';
+                avatarDiv.textContent = isUser ? '👤' : '🤖';
+                
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = 'message-bubble';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'ai-content';
+                contentDiv.innerHTML = content;
+                bubbleDiv.appendChild(contentDiv);
+                
+                if (responseTime && !isUser) {
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'response-time';
+                    timeDiv.textContent = `生成时间: ${responseTime}`;
+                    bubbleDiv.appendChild(timeDiv);
+                }
+                
+                messageDiv.appendChild(avatarDiv);
+                messageDiv.appendChild(bubbleDiv);
+                this.chatMessages.appendChild(messageDiv);
+                
+                this.scrollToBottom();
+            }
+            
+            sendQuestion() {
+                const question = this.questionInput.value.trim();
+                if (!question) return;
+                
+                // 添加用户消息
+                this.addMessage(this.escapeHtml(question), true);
+                this.questionInput.value = '';
+                this.adjustInputHeight();
+                
+                // 显示加载指示器
+                this.loadingIndicator.style.display = 'block';
+                this.scrollToBottom();
+                
+                // 发送请求到后端
+                fetch('/ask/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ question: question })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    this.loadingIndicator.style.display = 'none';
+                    
+                    if (data.success) {
+                        this.addMessage(data.answer, false, data.response_time);
+                    } else {
+                        this.addMessage(`抱歉，发生错误：${data.error || '未知错误'}`, false);
+                    }
+                })
+                .catch(error => {
+                    this.loadingIndicator.style.display = 'none';
+                    this.addMessage('网络错误，请检查连接后重试', false);
+                    console.error('Error:', error);
+                });
+            }
+            
+            scrollToBottom() {
+                setTimeout(() => {
+                    this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+                }, 100);
+            }
+            
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+        }
+        
+        // 初始化聊天应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new ChatApp();
+        });
+    </script>
+</body>
+</html>
